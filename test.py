@@ -93,11 +93,11 @@ class SceneVideoWanIteratorNode:
 
         return wf_copy
 
-    def _poll_for_completion(self, comfy_api_url, prompt_id, scene_id, poll_interval = 3):
+    def _poll_for_completion(self, comfy_api_url, prompt_id, scene_id, poll_interval = 5):
         """Polls the ComfyUI API history for the prompt's completion."""
         self.logger.info(f"Scene {scene_id} - Starting poll loop for prompt ID: {prompt_id}.")
         
-        max_retries = 5
+        max_retries = 500
         retries = 0
 
         while True:
