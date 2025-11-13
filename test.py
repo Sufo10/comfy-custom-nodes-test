@@ -253,6 +253,13 @@ class SceneVideoWanIteratorNode:
             with open(workflow_path, "r") as f:
                 workflow_data = json.load(f)
             self.logger.info(f"Workflow template loaded from: {workflow_path}")
+            
+            # --- MODIFICATION 1: Print loaded workflow JSON ---
+            print("\n--- LOADED WORKFLOW JSON START ---")
+            print(json.dumps(workflow_data, indent=2))
+            print("--- LOADED WORKFLOW JSON END ---\n")
+            # ----------------------------------------------------
+            
         except FileNotFoundError:
             error_msg = f"Workflow file not found at: {workflow_path}"
             self.logger.error(error_msg)
@@ -291,5 +298,13 @@ class SceneVideoWanIteratorNode:
 
         self.logger.info(f"\n--- All Scenes Processed. Total Results: {len(results)} ---\n")
         
+        final_results_json = json.dumps(results)
+        
+        # --- MODIFICATION 2: Print final results JSON ---
+        print("\n--- FINAL RESULTS JSON START ---")
+        print(final_results_json)
+        print("--- FINAL RESULTS JSON END ---\n")
+        # --------------------------------------------------
+        
         # Return results as a JSON string
-        return (json.dumps(results), video_output_dir)
+        return (final_results_json, video_output_dir)
