@@ -1,4 +1,4 @@
-const { app } = window.comfyAPI.app;
+import { app } from "/scripts/app.js";
 
 app.registerExtension({
   name: 'Comfy.DynamicWorkflowEditor',
