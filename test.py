@@ -105,9 +105,9 @@ class SceneVideoWanIteratorNode:
             duration = end - start
             required_length = math.ceil(duration * fps)
             wf_copy["55"]["inputs"]["length"] = int(required_length)
-            self.logger.info(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node 58.")
+            self.logger.info(f"Scene {scene_id} - Set length to {required_length} in node 55.")
         else:
-            self.logger.warning(f"Scene {scene_id} - Node 55 not found for filename prefix setting.")
+            self.logger.warning(f"Scene {scene_id} - Node 55 not found for length setting.")
         return wf_copy
 
     def _poll_for_completion(self, comfy_api_url, prompt_id, scene_id, poll_interval = 5):
