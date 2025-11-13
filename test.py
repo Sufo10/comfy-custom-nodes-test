@@ -119,14 +119,14 @@ class SceneVideoWanIteratorNode:
                         self.logger.error(f"Scene {scene_id} - Polling failed. Status: FAILED.")
                         raise RuntimeError(f"Workflow failed on ComfyUI for scene {scene_id}.")
                 
-                retries = 0 
+                retries += 1
+                self.logger.error(f"Scene {scene_id} - retries: {retries}")
 
             except requests.exceptions.HTTPError as e:
                 self.logger.error(f"Scene {scene_id} - Polling HTTP error: {e}. Status code: {e.response.status_code}")
                 raise ConnectionError(f"Polling HTTP failure: {e}")
             except requests.exceptions.RequestException as e:
                 retries += 1
-                self.logger.error(f"Scene retries: {retries}")
                 if retries >= max_retries:
                     self.logger.error(f"Scene {scene_id} - Polling failed after {max_retries} retries.")
                     raise ConnectionError(f"Polling connection failed after {max_retries} retries: {e}")
