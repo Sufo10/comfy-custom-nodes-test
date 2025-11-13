@@ -91,6 +91,7 @@ class SceneVideoWanIteratorNode:
         else:
             self.logger.warning(f"Scene {scene_id} - Node 80 not found for filename prefix setting.")
 
+        print(json.dumps(wf_copy, indent=2))
         return wf_copy
 
     def _poll_for_completion(self, comfy_api_url, prompt_id, scene_id, poll_interval = 5):
