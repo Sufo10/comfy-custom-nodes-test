@@ -240,20 +240,20 @@ class SceneVideoWanIteratorNode:
             # Since download is skipped, we only confirm generation completed on server
             self.logger.info(f"Scene {scene_id} - SUCCESS. Generation completed on server in {duration}s.")
             
-            return {"scene": scene_id, "video_path": result, "status": "done", "duration_s": duration}
+            return {"scene": scene_id, "video_path": result, "status": "done"}
         
         except requests.exceptions.HTTPError as e:
             # Catch HTTP errors specific to the /prompt endpoint
             duration = round(time.time() - start_time, 2)
             error_message = f"HTTPError ({e.response.status_code}) during prompt submission: {str(e)}"
             self.logger.error(f"Scene {scene_id} - FAILED. Total time: {duration}s. Error: {error_message}")
-            return {"scene": scene_id, "error": error_message, "status": "failed", "duration_s": duration}
+            return {"scene": scene_id, "error": error_message, "status": "failed"}
         except Exception as e:
             # Catch all other exceptions (ValueError, RuntimeError, etc.)
             duration = round(time.time() - start_time, 2)
             error_message = f"{e.__class__.__name__}: {str(e)}"
             self.logger.error(f"Scene {scene_id} - FAILED. Total time: {duration}s. Error: {error_message}")
-            return {"scene": scene_id, "error": error_message, "status": "failed", "duration_s": duration}
+            return {"scene": scene_id, "error": error_message, "status": "failed"}
 
     def run_scenes(self, scenes_json, comfy_api_url, video_output_dir, workflow_path, max_workers = 3, trigger = 0):
         """Main execution function."""

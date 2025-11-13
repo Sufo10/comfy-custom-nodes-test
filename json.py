@@ -73,5 +73,5 @@ class JSONArrayPathConcatenator:
 
         # 4. Concatenate Results
         final_string = delimiter.join(extracted_values)
-        
+        print(f"Concatenated String: {final_string}")
         return (final_string,)
