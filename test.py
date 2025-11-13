@@ -1,5 +1,6 @@
 import json
 import time
+import math
 import logging
 import requests
 from pathlib import Path
@@ -73,6 +74,8 @@ class SceneVideoWanIteratorNode:
         """Deep copies the workflow and injects the scenario and sets the filename prefix."""
         scenario = scene.get("scenario", "No scenario provided")
         scene_id = scene.get("scene", "N/A")
+        start = scene.get("start", 0)
+        end = scene.get("end", 0)
 
         wf_copy = json.loads(json.dumps(workflow)) 
         
@@ -90,6 +93,21 @@ class SceneVideoWanIteratorNode:
             self.logger.info(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node 58.")
         else:
             self.logger.warning(f"Scene {scene_id} - Node 58 not found for filename prefix setting.")
+        
+        # Set frame rate into node 55
+        if "55" in wf_copy and '57' in wf_copy:
+            try:
+                fps_value = wf_copy.get("57", {}).get("inputs", {}).get("fps")
+                fps = float(fps_value) if fps_value is not None else 24.0
+            except (ValueError, TypeError):
+                fps = 24.0
+                self.logger.warning(f"Scene {scene_id} - Node 57 FPS value is invalid. Defaulting to {fps} FPS.")
+            duration = end - start
+            required_length = math.ceil(duration * fps)
+            wf_copy["55"]["inputs"]["length"] = int(required_length)
+            self.logger.info(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node 58.")
+        else:
+            self.logger.warning(f"Scene {scene_id} - Node 55 not found for filename prefix setting.")
         return wf_copy
 
     def _poll_for_completion(self, comfy_api_url, prompt_id, scene_id, poll_interval = 5):
@@ -316,4 +334,4 @@ class SceneVideoWanIteratorNode:
         # --------------------------------------------------
         
         # Return results as a JSON string
-        return (final_results_json)
+        return (final_results_json,)
