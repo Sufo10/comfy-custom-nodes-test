@@ -38,8 +38,8 @@ class SceneVideoWanIteratorNode:
             },
         }
 
-    RETURN_TYPES = ("STRING") 
-    RETURN_NAMES = ("results")
+    RETURN_TYPES = ("STRING",) 
+    RETURN_NAMES = ("results",)
     FUNCTION = "run_scenes"
     CATEGORY = "Video Generation"
     OUTPUT_NODE = True 
