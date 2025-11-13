@@ -107,7 +107,7 @@ class SceneVideoWanIteratorNode:
                 response = requests.get(f"{comfy_api_url}/history/{prompt_id}", timeout=10)
                 response.raise_for_status() # Catches HTTPError if status code is bad
                 data = response.json()
-                self.logger.debug(f"Scene {scene_id} - Polling response: {json.dumps(data, indent=2)}")
+                self.logger.info(f"Scene {scene_id} - Polling response: {json.dumps(data, indent=2)}")
                 
                 if prompt_id in data:
                     entry = data[prompt_id]
