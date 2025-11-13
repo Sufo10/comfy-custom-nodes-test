@@ -77,21 +77,19 @@ class SceneVideoWanIteratorNode:
         wf_copy = json.loads(json.dumps(workflow)) 
         
         # Inject Scenario into node 89 (CLIPTextEncode/Prompt)
-        if "89" in wf_copy:
-            wf_copy["89"]["inputs"]["text"] = scenario
-            self.logger.debug(f"Scene {scene_id} - Injected scenario into node 89.")
+        if "6" in wf_copy:
+            wf_copy["6"]["inputs"]["text"] = scenario
+            self.logger.debug(f"Scene {scene_id} - Injected scenario into node 6.")
         else:
-            self.logger.warning(f"Scene {scene_id} - Node 89 not found for scenario injection.")
+            self.logger.warning(f"Scene {scene_id} - Node 6 not found for scenario injection.")
 
         # Set Filename Prefix into node 80 (Save Image/Video)
-        if "80" in wf_copy:
+        if "58" in wf_copy:
             prefix = f"video/test/scene_{scene_id}"
-            wf_copy["80"]["inputs"]["filename_prefix"] = prefix
-            self.logger.debug(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node 80.")
+            wf_copy["58"]["inputs"]["filename_prefix"] = prefix
+            self.logger.debug(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node 58.")
         else:
-            self.logger.warning(f"Scene {scene_id} - Node 80 not found for filename prefix setting.")
-
-        print(json.dumps(wf_copy, indent=2))
+            self.logger.warning(f"Scene {scene_id} - Node 58 not found for filename prefix setting.")
         return wf_copy
 
     def _poll_for_completion(self, comfy_api_url, prompt_id, scene_id, poll_interval = 5):
