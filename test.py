@@ -110,6 +110,7 @@ class SceneVideoWanIteratorNode:
                 if prompt_id in data:
                     entry = data[prompt_id]
                     status = entry.get("status", {"status_str": ""}).get("status_str", "").lower()
+                    self.logger.info(f"Scene {scene_id} - Output: {entry.get('output')}")
                     outputs = entry.get("output", {"58": {"images": []}}).get("58", {"images": []}).get("images", [])[0]
 
                     if outputs:
