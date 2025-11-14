@@ -90,7 +90,7 @@ class BaseSceneIteratorNode:
                 response = requests.get(f"{comfy_api_url}/history/{prompt_id}", timeout=10)
                 response.raise_for_status() # Catches HTTPError if status code is bad
                 data = response.json()
-                self.logger.info(f"Scene {scene_id} - Polling response status code: {response.status_code}")
+                self.logger.info(f"Scene {scene_id} - Polling response data: {data}")
                 
                 if prompt_id in data:
                     entry = data[prompt_id]
@@ -120,7 +120,7 @@ class BaseSceneIteratorNode:
                 if retries >= max_retries:
                     self.logger.error(f"Scene {scene_id} - Polling failed after {max_retries} retries.")
                     raise ConnectionError(f"Polling connection failed after {max_retries} retries.")
-                self.logger.warning(f"Scene {scene_id} - Polling connection error (No output/History not updated). Retries count: {retries}/{max_retries}. Retrying in {poll_interval}s...")
+                self.logger.warning(f"Scene {scene_id} - Retries count: {retries}/{max_retries}. Retrying in {poll_interval}s...")
 
             except requests.exceptions.RequestException as e:
                 retries += 1
