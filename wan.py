@@ -15,6 +15,7 @@ class BaseSceneIteratorNode:
     The derived class MUST implement the abstract method:
     _inject_scene_into_workflow(self, workflow, scene, video_output_dir)
     """
+    OUTPUT_NODE_ID = "58"
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -98,7 +99,7 @@ class BaseSceneIteratorNode:
                     # The status_str logic in the original was complex, simplifying to check if outputs exist
                     
                     # Check if the save node (ID 58 from original) has an output entry
-                    outputs_for_save_node = entry.get("outputs", {}).get("58", {}).get("images", [])
+                    outputs_for_save_node = entry.get("outputs", {}).get(self.OUTPUT_NODE_ID, {}).get("images", [])
                     
                     if outputs_for_save_node:
                         # Assuming success if the save node ran and produced a file info
@@ -247,6 +248,8 @@ class SceneVideoWan5BIteratorNode(BaseSceneIteratorNode):
     Specializes in injecting scene data into a specific workflow structure.
     """
 
+    OUTPUT_NODE_ID = "58"
+
     @classmethod
     def INPUT_TYPES(cls):
         inputs = super().INPUT_TYPES()
@@ -318,6 +321,8 @@ class SceneVideoWan14BIteratorNode(BaseSceneIteratorNode):
     Concrete implementation extending BaseSceneIteratorNode.
     Specializes in injecting scene data into a specific workflow structure.
     """
+
+    OUTPUT_NODE_ID = "80"
 
     @classmethod
     def INPUT_TYPES(cls):
