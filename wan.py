@@ -81,7 +81,7 @@ class BaseSceneIteratorNode:
         """Polls the ComfyUI API history for the prompt's completion."""
         self.logger.info(f"Scene {scene_id} - Starting poll loop for prompt ID: {prompt_id}.")
         
-        max_retries = 50
+        max_retries = 100
         retries = 0
 
         while True:
