@@ -1,9 +1,9 @@
 import os
 import time
 import shutil
-from moviepy.editor import VideoFileClip, concatenate_videoclips, AudioFileClip 
+from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip 
 from pathlib import Path
-import folder_paths # Essential for ComfyUI temp/output paths
+import folder_paths 
 import torch
 import torchaudio
 
