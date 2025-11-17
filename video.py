@@ -148,7 +148,7 @@ class CustomVideoConcatenator:
                 output_path, 
                 codec='libx264',  
                 audio=final_audio_path,         
-                audio_codec='aac',        
+                audio_codec='aac',   
             )
             print(f"Video saved successfully to: {output_path}")
             

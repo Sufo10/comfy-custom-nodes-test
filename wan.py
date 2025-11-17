@@ -5,7 +5,7 @@ import logging
 import requests
 from pathlib import Path
 import concurrent.futures
-
+import copy # Import copy for safer deep copying
 
 class BaseSceneIteratorNode:
     """
@@ -15,7 +15,9 @@ class BaseSceneIteratorNode:
     The derived class MUST implement the abstract method:
     _inject_scene_into_workflow(self, workflow, scene, video_output_dir)
     """
-    OUTPUT_NODE_ID = "58"
+    # NOTE: The OUTPUT_NODE_ID should be defined in the derived classes based on the workflow
+    # It is used here as a placeholder for the polling logic.
+    OUTPUT_NODE_ID = "58" 
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -24,7 +26,7 @@ class BaseSceneIteratorNode:
                 "scenes_json": ("STRING", {
                     "multiline": True,
                     "default": "[]",
-                    "tooltip": "JSON array of scenes with 'scene', 'start', 'end', 'dialogue', and 'scenario' keys"
+                    "tooltip": "JSON array of scenes with 'scene', 'start', 'end', 'dialogue', and 'positive_prompt'/'negative_prompt' keys"
                 }),
                 "comfy_api_url": ("STRING", {"default": "http://localhost:8188", "tooltip": "Base URL of the ComfyUI API (e.g., http://localhost:8188)"}),
                 "workflow_path": ("STRING", {"default": "./workflow.json", "tooltip": "Path to the ComfyUI workflow template JSON file."}),
@@ -60,13 +62,15 @@ class BaseSceneIteratorNode:
 
         logger = logging.getLogger(self.__class__.__name__)
         logger.setLevel(logging.INFO)
-        if not logger.hasHandlers():
-            logger.addHandler(handler)
+        # Prevent adding multiple stream handlers if the node is re-run
+        if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+            # Add a stream handler for console output during execution
+            stream_handler = logging.StreamHandler()
+            stream_handler.setFormatter(formatter)
+            logger.addHandler(stream_handler)
         
-        # Add a stream handler for console output during execution
-        stream_handler = logging.StreamHandler()
-        stream_handler.setFormatter(formatter)
-        logger.addHandler(stream_handler)
+        if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
+             logger.addHandler(handler)
 
         return logger
 
@@ -91,29 +95,25 @@ class BaseSceneIteratorNode:
                 response = requests.get(f"{comfy_api_url}/history/{prompt_id}", timeout=10)
                 response.raise_for_status() # Catches HTTPError if status code is bad
                 data = response.json()
-                self.logger.info(f"Scene {scene_id} - Polling response data: {data}")
+                self.logger.debug(f"Scene {scene_id} - Polling response data: {data}")
                 
                 if prompt_id in data:
                     entry = data[prompt_id]
-                    # Check for status based on whether the output node ran
-                    # The status_str logic in the original was complex, simplifying to check if outputs exist
                     
-                    # Check if the save node (ID 58 from original) has an output entry
-                    outputs_for_save_node = entry.get("outputs", {}).get(self.OUTPUT_NODE_ID, {}).get("images", [])
+                    # Check if the designated output node ran and produced an image/file path
+                    outputs_for_output_node = entry.get("outputs", {}).get(self.OUTPUT_NODE_ID, {}).get("images", [])
                     
-                    if outputs_for_save_node:
+                    if outputs_for_output_node:
                         # Assuming success if the save node ran and produced a file info
-                        output_info = outputs_for_save_node[0]
-                        subfolder = output_info.get("subfolder", "")
-                        filename = output_info.get("filename", "")
-                        output_path = f"output/{subfolder}/{filename}"
+                        output_info = outputs_for_output_node[0]
+                        # ComfyUI file structure includes type (e.g., 'output')
+                        output_path = f"{output_info.get('type')}/{output_info.get('subfolder', '')}/{output_info.get('filename', '')}"
                         self.logger.info(f"Scene {scene_id} - Polling successful. Status: COMPLETED. File: {output_path}")
                         return output_path
                     
-                    # You might need more robust error checking here based on ComfyUI's internal status
-                    # For now, if the prompt is in history but has no output, we assume failure or retry
-                    status = entry.get("status", {}).get("status_str", "").lower()
-                    if status == "error":
+                    # Check for explicit failure state reported by the API
+                    status_str = entry.get("status", {}).get("status_str", "").lower()
+                    if status_str == "error":
                          self.logger.error(f"Scene {scene_id} - Polling failed. Status: FAILED (API reported error).")
                          raise RuntimeError(f"Workflow failed on ComfyUI for scene {scene_id}.")
 
@@ -134,8 +134,8 @@ class BaseSceneIteratorNode:
     def _run_scene(self, comfy_api_url, video_output_dir, workflow_data, scene):
         """Submits, polls, and tracks the video generation for a single scene."""
         scene_id = scene.get("scene", "N/A")
-        scenario = scene.get("scenario", "No scenario provided")
-        start_time = time.time()
+        scenario = scene.get("positive_prompt", "No scenario provided") # Use positive prompt for preview
+        start_time = time.time() 
         
         self.logger.info(f"\n--- Scene {scene_id} START ---")
         self.logger.info(f"Scenario Preview: {scenario[:80]}...")
@@ -181,7 +181,6 @@ class BaseSceneIteratorNode:
 
     def run_scenes(self, scenes_json, comfy_api_url, video_output_dir, workflow_path, max_workers = 3, trigger = 0):
         """Main execution function, running scenes concurrently."""
-        # ... (Same as original run_scenes logic, but calls the base's methods)
         total_start_time = time.time()
         try:
             scenes = json.loads(scenes_json)
@@ -194,6 +193,21 @@ class BaseSceneIteratorNode:
             self.logger.info("No scenes provided in JSON input. Returning empty results.")
             return (json.dumps([]),)
 
+        # --- MANDATORY VALIDATION CHECK ---
+        for i, scene in enumerate(scenes):
+            scene_id = scene.get("scene", f"Index {i+1}")
+            
+            if "positive_prompt" not in scene or not scene["positive_prompt"]:
+                error_msg = f"Scene {scene_id} is missing the required key: 'positive_prompt' or its value is empty. Cannot proceed."
+                self.logger.error(error_msg)
+                return (json.dumps([{"scene": scene_id, "error": error_msg, "status": "failed"}]),)
+            
+            if "negative_prompt" not in scene or not scene["negative_prompt"]:
+                error_msg = f"Scene {scene_id} is missing the required key: 'negative_prompt' or its value is empty. Cannot proceed."
+                self.logger.error(error_msg)
+                return (json.dumps([{"scene": scene_id, "error": error_msg, "status": "failed"}]),)
+        # --- END VALIDATION CHECK ---
+        
         # Pre-execution checks and setup
         try:
             video_output_dir_path = Path(video_output_dir)
@@ -246,6 +260,13 @@ class SceneVideoWan5BIteratorNode(BaseSceneIteratorNode):
     """
     Concrete implementation extending BaseSceneIteratorNode.
     Specializes in injecting scene data into a specific workflow structure.
+    
+    Assumes: 
+    - Node 6: Positive Prompt (Text node)
+    - Node 7: Negative Prompt (Text node)
+    - Node 58: Save Image/Video Node (Filename Prefix)
+    - Node 55: Video Generation Node (Length/Frames)
+    - Node 57: FPS setting node (used for calculation)
     """
 
     OUTPUT_NODE_ID = "58"
@@ -263,36 +284,36 @@ class SceneVideoWan5BIteratorNode(BaseSceneIteratorNode):
 
     def _inject_scene_into_workflow(self, workflow, scene, video_output_dir):
         """Deep copies the workflow and injects the scenario and sets the filename prefix."""
-        positive_prompt = scene.get("positive_prompt", "No scenario provided")
-        negative_prompt = scene.get("negative_prompt", "No scenario provided")
+        positive_prompt = scene.get("positive_prompt")
+        negative_prompt = scene.get("negative_prompt")
         scene_id = scene.get("scene", "N/A")
         start = scene.get("start", 0)
         end = scene.get("end", 0)
 
-        # Deep copy the workflow template
-        wf_copy = json.loads(json.dumps(workflow)) 
+        # Deep copy the workflow template for modification
+        wf_copy = copy.deepcopy(workflow)
         
-        # Positive Prompt Injection
+        # Positive Prompt Injection (Node 6)
         if "6" in wf_copy:
             wf_copy["6"]["inputs"]["text"] = positive_prompt
             self.logger.info(f"Scene {scene_id} - Injected scenario into node 6.")
         else:
             self.logger.warning(f"Scene {scene_id} - Node 6 not found for scenario injection.")
 
-        # Negative Prompt Injection
+        # Negative Prompt Injection (Node 7)
         if "7" in wf_copy:
             wf_copy["7"]["inputs"]["text"] = negative_prompt
             self.logger.info(f"Scene {scene_id} - Injected negative into node 7.")
         else:
             self.logger.warning(f"Scene {scene_id} - Node 7 not found for scenario injection.")
 
-        # Filename Prefix Setting
-        if "58" in wf_copy:
-            prefix = f"{Path(video_output_dir).as_posix().rstrip('/')}/scene_{scene_id}"
-            wf_copy["58"]["inputs"]["filename_prefix"] = prefix
-            self.logger.info(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node 58.")
+        # Filename Prefix Setting (Node 58)
+        if self.OUTPUT_NODE_ID in wf_copy:
+            prefix = Path(video_output_dir).joinpath(f"scene_{scene_id}").as_posix()
+            wf_copy[self.OUTPUT_NODE_ID]["inputs"]["filename_prefix"] = prefix
+            self.logger.info(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node {self.OUTPUT_NODE_ID}.")
         else:
-            self.logger.warning(f"Scene {scene_id} - Node 58 not found for filename prefix setting.")
+            self.logger.warning(f"Scene {scene_id} - Node {self.OUTPUT_NODE_ID} not found for filename prefix setting.")
         
         # Video Length Calculation and Setting
         if "55" in wf_copy and '57' in wf_copy:
@@ -321,6 +342,13 @@ class SceneVideoWan14BIteratorNode(BaseSceneIteratorNode):
     """
     Concrete implementation extending BaseSceneIteratorNode.
     Specializes in injecting scene data into a specific workflow structure.
+    
+    Assumes: 
+    - Node 89: Positive Prompt (Text node)
+    - Node 72: Negative Prompt (Text node)
+    - Node 80: Save Image/Video Node (Filename Prefix)
+    - Node 74: Video Generation Node (Length/Frames)
+    - Node 88: FPS setting node (used for calculation)
     """
 
     OUTPUT_NODE_ID = "80"
@@ -338,41 +366,41 @@ class SceneVideoWan14BIteratorNode(BaseSceneIteratorNode):
 
     def _inject_scene_into_workflow(self, workflow, scene, video_output_dir):
         """Deep copies the workflow and injects the scenario and sets the filename prefix."""
-        positive_prompt = scene.get("positive_prompt", "No scenario provided")
-        negative_prompt = scene.get("negative_prompt", "No scenario provided")
+        positive_prompt = scene.get("positive_prompt")
+        negative_prompt = scene.get("negative_prompt")
         scene_id = scene.get("scene", "N/A")
         start = scene.get("start", 0)
         end = scene.get("end", 0)
 
-        # Deep copy the workflow template
-        wf_copy = json.loads(json.dumps(workflow)) 
+        # Deep copy the workflow template for modification
+        wf_copy = copy.deepcopy(workflow) 
         
-        # Positive Prompt Injection
+        # Positive Prompt Injection (Node 89)
         if "89" in wf_copy:
             wf_copy["89"]["inputs"]["text"] = positive_prompt
             self.logger.info(f"Scene {scene_id} - Injected scenario into node 89.")
         else:
             self.logger.warning(f"Scene {scene_id} - Node 89 not found for scenario injection.")
 
-        # Negative Prompt Injection
+        # Negative Prompt Injection (Node 72)
         if "72" in wf_copy:
             wf_copy["72"]["inputs"]["text"] = negative_prompt
             self.logger.info(f"Scene {scene_id} - Injected negative into node 72.")
         else:
             self.logger.warning(f"Scene {scene_id} - Node 72 not found for scenario injection.")
 
-        # Filename Prefix Setting
-        if "80" in wf_copy:
-            prefix = f"{Path(video_output_dir).as_posix().rstrip('/')}/scene_{scene_id}"
-            wf_copy["80"]["inputs"]["filename_prefix"] = prefix
-            self.logger.info(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node 80.")
+        # Filename Prefix Setting (Node 80)
+        if self.OUTPUT_NODE_ID in wf_copy:
+            prefix = Path(video_output_dir).joinpath(f"scene_{scene_id}").as_posix()
+            wf_copy[self.OUTPUT_NODE_ID]["inputs"]["filename_prefix"] = prefix
+            self.logger.info(f"Scene {scene_id} - Set filename prefix to '{prefix}' in node {self.OUTPUT_NODE_ID}.")
         else:
-            self.logger.warning(f"Scene {scene_id} - Node 80 not found for filename prefix setting.")
+            self.logger.warning(f"Scene {scene_id} - Node {self.OUTPUT_NODE_ID} not found for filename prefix setting.")
         
         # Video Length Calculation and Setting
         if "74" in wf_copy and '88' in wf_copy:
             try:
-                # Get FPS value from a connected node (assuming it's node 57)
+                # Get FPS value from a connected node (assuming it's node 88)
                 fps_value = wf_copy.get("88", {}).get("inputs", {}).get("fps")
                 fps = float(fps_value) if fps_value is not None else 24.0
             except (ValueError, TypeError):
@@ -381,13 +409,12 @@ class SceneVideoWan14BIteratorNode(BaseSceneIteratorNode):
             
             duration = end - start
             # Calculate total required frames, rounding up to ensure the full duration is covered
-            required_length = math.floor(duration * fps)
+            required_length = math.ceil(duration * fps) # Use ceil instead of floor for full duration
             
-            # Set the length (frames) into the video generating node (assuming it's node 55)
+            # Set the length (frames) into the video generating node (assuming it's node 74)
             wf_copy["74"]["inputs"]["length"] = int(required_length)
             self.logger.info(f"Scene {scene_id} - Set length to {required_length} frames in node 74 (Duration: {duration}s).")
         else:
             self.logger.warning(f"Scene {scene_id} - Node 74/88 not found for length setting.")
             
         return wf_copy
-    
