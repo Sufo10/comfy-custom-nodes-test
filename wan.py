@@ -327,7 +327,7 @@ class SceneVideoWan5BIteratorNode(BaseSceneIteratorNode):
             
             duration = end - start
             # Calculate total required frames, rounding up to ensure the full duration is covered
-            required_length = math.floor(duration * fps)
+            required_length = math.ceil(duration * fps)
             
             # Set the length (frames) into the video generating node (assuming it's node 55)
             wf_copy["55"]["inputs"]["length"] = int(required_length)
@@ -409,7 +409,7 @@ class SceneVideoWan14BIteratorNode(BaseSceneIteratorNode):
             
             duration = end - start
             # Calculate total required frames, rounding up to ensure the full duration is covered
-            required_length = math.floor(duration * fps) # Use ceil instead of floor for full duration
+            required_length = math.ceil(duration * fps) # Use ceil instead of floor for full duration
             
             # Set the length (frames) into the video generating node (assuming it's node 74)
             wf_copy["74"]["inputs"]["length"] = int(required_length)
