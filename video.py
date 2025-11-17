@@ -1,12 +1,17 @@
 import os
 import time
-from moviepy import VideoFileClip, concatenate_videoclips
+import shutil
+from moviepy.editor import VideoFileClip, concatenate_videoclips, AudioFileClip 
 from pathlib import Path
+import folder_paths # Essential for ComfyUI temp/output paths
+import torch
+import torchaudio
 
 class CustomVideoConcatenator:
     """
-    ComfyUI Custom Node to concatenate multiple video files listed in a JSON string 
-    using the moviepy library.
+    ComfyUI Custom Node to concatenate multiple video files listed in a multiline string 
+    using the moviepy library, supporting external audio file paths or direct audio 
+    waveform input from other ComfyUI nodes.
     """
 
     CATEGORY = "Custom Video Generation"
@@ -21,8 +26,20 @@ class CustomVideoConcatenator:
                     "placeholder": "Enter a multiline string of video paths here"
                 }),
                 "output_filename_prefix": ("STRING", {"default": "ComfyUI"}),
-                "output_directory": ("STRING", {"default": "output"}),
+                "output_directory": ("STRING", {"default": "output/moviepy"}), # Set a descriptive default subdirectory
             },
+            "optional": { 
+                # String path input (e.g., from a Load Text node or text entry)
+                "audio_path": ("STRING", { 
+                    "default": "",
+                    "placeholder": "Optional: Path to an external audio file (e.g., .mp3, .wav)"
+                }),
+                # Audio waveform object from an audio node
+                "audio": ("AUDIO", {
+                    "placeholder": "Optional: Audio waveform and sample rate",
+                    "forceInput": True
+                })
+            }
         }
 
     # Define the output types for the node
@@ -32,78 +49,124 @@ class CustomVideoConcatenator:
     # Define the name of the function to execute when the node runs
     FUNCTION = "concat_videos"
 
-    def concat_videos(self, multiline_video_paths, output_filename_prefix, output_directory):
-        """
-        Loads video clips, concatenates them, and saves the final video file.
-        The output video is saved to the location specified by output_directory.
-        """
+    def concat_videos(self, multiline_video_paths, output_filename_prefix, output_directory, audio_path=None, audio=None):
         
         print(f"Starting video concatenation for files with prefix: {output_filename_prefix}")
+
+        final_audio_path = None
+        temp_audio_dir = None
         
-        # 1. Parse the multiline string input into a Python list of paths
+        # --- 0. Determine Audio Source ---
+        if audio_path and os.path.exists(audio_path):
+            final_audio_path = os.path.abspath(audio_path.strip())
+            print(f"Using external audio file: {final_audio_path}")
+            
+        elif audio is not None and 'waveform' in audio and 'sample_rate' in audio:
+            # Create a dedicated temporary folder for the audio file
+            try:
+                base_temp_dir = folder_paths.get_temp_directory()
+                temp_audio_dir = os.path.join(base_temp_dir, f"video_concat_audio_temp_{int(time.time())}")
+                os.makedirs(temp_audio_dir, exist_ok=True)
+                
+                # Define the final path inside the temp folder
+                final_audio_path = os.path.join(temp_audio_dir, "temp_audio.wav")
+                waveform = audio['waveform']
+                sample_rate = audio['sample_rate']
+                
+                # Normalize and format tensor for torchaudio.save (standard practice)
+                if waveform.dim() == 3:
+                    waveform = waveform.squeeze(0)
+                elif waveform.dim() == 1:
+                    waveform = waveform.unsqueeze(0)
+                
+                if waveform.dtype != torch.float32:
+                    waveform = waveform.float()
+                waveform = waveform.clamp(-1, 1)
+                
+                torchaudio.save(final_audio_path, waveform, sample_rate)
+                print(f"Using waveform audio, saved temporarily to: {final_audio_path}")
+                
+            except Exception as e:
+                # Log error and proceed without audio if waveform saving fails
+                print(f"WARNING: Failed to process or save waveform audio. Error: {e}. Proceeding without audio.")
+                final_audio_path = None 
+                temp_audio_dir = None
+        
+        if not final_audio_path:
+            print("No valid audio track will be attached. Concatenating video clips silently.")
+        
+        # --- 1. Parse Video Paths and Pre-Checks ---
         video_paths = [path.strip() for path in multiline_video_paths.split('\n') if path.strip()]
         video_paths = [os.path.abspath(path) for path in video_paths]
+        
+        if len(video_paths) < 1:
+            raise ValueError("ERROR: Must provide at least one video path to process.")
+        
         for path in video_paths:
             if not Path(path).exists():
                 raise ValueError(f"Video path does not exist: {path}")
 
-        if len(video_paths) < 2:
-            warning_msg = "WARNING: Need at least two videos to concatenate. Returning original path or empty string."
-            print(warning_msg)
-            return (video_paths[0] if video_paths else "",)
+        if len(video_paths) == 1:
+            print(f"WARNING: Only one video provided. Returning the path to the original file: {video_paths[0]}")
+            return (video_paths[0],)
 
-        # 2. Load the video clips
+        # --- 2. Load and Concatenate Video Clips ---
         clips = []
-        path = "" # Initialize path for cleanup/error reporting
-        try:
-            for path in video_paths:
-                # Use VideoFileClip to load the video object from the path
-                clip = VideoFileClip(path)
-                clips.append(clip)
-                print(f"Loaded clip: {path} (Duration: {clip.duration:.2f}s)")
-        except Exception as e:
-            # Cleanup any already loaded clips
-            for c in clips:
-                c.close()
-            error_msg = f"ERROR loading video clip at path: {path}. Error: {e}"
-            print(error_msg)
-            raise RuntimeError(error_msg)
-
-        # 3. Concatenate the clips
         final_clip = None
         try:
+            for path in video_paths:
+                clip = VideoFileClip(path)
+                clips.append(clip)
+            
             # concatenate_videoclips joins the clips end-to-end.
-            # 'compose' method handles clips of different sizes by centering them.
             final_clip = concatenate_videoclips(clips, method='compose')
             print(f"Successfully concatenated {len(clips)} clips. Total duration: {final_clip.duration:.2f}s")
+            
+            # --- 3. Attach Audio (if source found) ---
+            if final_audio_path and Path(final_audio_path).exists():
+                audio_clip = AudioFileClip(final_audio_path)
+                
+                # Duration check and trim
+                if abs(audio_clip.duration - final_clip.duration) > 0.1:
+                    print(f"WARNING: Audio clip duration ({audio_clip.duration:.2f}s) does not match video duration ({final_clip.duration:.2f}s). Trimming audio to match video duration.")
+                    audio_clip = audio_clip.subclip(0, final_clip.duration)
+                        
+                final_clip = final_clip.set_audio(audio_clip)
+                print("Successfully attached audio track.")
+                audio_clip.close() # Close audio clip immediately after setting
+            else:
+                # Detach audio from the final clip to ensure clean output if no audio was found
+                final_clip = final_clip.set_audio(None) 
+                
         except Exception as e:
-            # Cleanup and report error
+            # Handle error during load or concatenation
+            error_msg = f"ERROR during video processing: {e}"
+            print(error_msg)
             for c in clips:
                 c.close()
-            error_msg = f"ERROR during moviepy concatenation: {e}"
-            print(error_msg)
+            if final_clip:
+                final_clip.close()
             raise RuntimeError(error_msg)
-
-        # 4. Define the output path using the provided output_directory
-        output_dir_path = Path(os.path.abspath(output_directory)) 
-        # Ensure the directory structure exists
+            
+        
+        # --- 4. Define Output Path ---
+        # Use ComfyUI standard output directory with the user-defined subdirectory
+        output_dir_path = Path(folder_paths.get_output_directory()) / output_directory
         output_dir_path.mkdir(parents=True, exist_ok=True) 
             
         timestamp = int(time.time())
-        # Clean the prefix and generate a unique filename
         clean_prefix = "".join(c for c in output_filename_prefix if c.isalnum() or c in ('_', '-')).rstrip()
         filename = f"{clean_prefix}_{timestamp}.mp4"
         output_path = str(output_dir_path / filename)
 
-        # 5. Write the final video file
+        # --- 5. Write the final video file (with quality optimization) ---
         try:
             final_clip.write_videofile(
                 output_path, 
-                # codec='libx264',           
-                # audio_codec='aac',         
-                # temp_audiofile='temp-audio.m4a', # Temporary file for audio processing
-                # remove_temp=True,
-                # logger=None # Suppress moviepy console spam
+                codec='libx264',           
+                audio_codec='aac',         
+                temp_audiofile='temp-audio.m4a', 
+                remove_temp=True,
             )
             print(f"Video saved successfully to: {output_path}")
             
@@ -115,7 +178,16 @@ class CustomVideoConcatenator:
             raise RuntimeError(error_msg)
             
         finally:
+            # --- 6. Cleanup ---
             for c in clips:
                 c.close()
             if final_clip:
                 final_clip.close()
+            
+            # Clean up the temporary directory created for the waveform audio
+            if temp_audio_dir and os.path.exists(temp_audio_dir):
+                try:
+                    shutil.rmtree(temp_audio_dir)
+                    print(f"Cleaned up temp audio directory: {temp_audio_dir}")
+                except Exception as e:
+                    print(f"WARNING: Failed to clean up temp audio directory {temp_audio_dir}. Error: {e}")
