@@ -1,7 +1,7 @@
 import os
 import time
 import shutil
-from moviepy import VideoFileClip, concatenate_videoclips, AudioFileClip 
+from moviepy import VideoFileClip, concatenate_videoclips 
 from pathlib import Path
 import folder_paths 
 import torch
