@@ -120,21 +120,7 @@ class CustomVideoConcatenator:
             
             # concatenate_videoclips joins the clips end-to-end.
             final_clip = concatenate_videoclips(clips, method='compose')
-            print(f"Successfully concatenated {len(clips)} clips. Total duration: {final_clip.duration:.2f}s")
-            
-            # --- 3. Attach Audio (if source found) ---
-            if final_audio_path and Path(final_audio_path).exists():
-                audio_clip = AudioFileClip(final_audio_path)
-                
-                # Duration check and trim
-                if abs(audio_clip.duration - final_clip.duration) > 0.1:
-                    print(f"WARNING: Audio clip duration ({audio_clip.duration:.2f}s) does not match video duration ({final_clip.duration:.2f}s). Trimming audio to match video duration.")
-                    audio_clip = audio_clip.subclipped(0, final_clip.duration)
-                        
-                final_clip = final_clip.with_audio(audio_clip)
-                print("Successfully attached audio track.")
-                audio_clip.close() # Close audio clip immediately after setting
-                
+            print(f"Successfully concatenated {len(clips)} clips. Total duration: {final_clip.duration:.2f}s")   
         except Exception as e:
             # Handle error during load or concatenation
             error_msg = f"ERROR during video processing: {e}"
@@ -162,8 +148,7 @@ class CustomVideoConcatenator:
                 output_path, 
                 codec='libx264',  
                 audio=final_audio_path,         
-                audio_codec='aac',         
-                remove_temp=True,
+                audio_codec='aac',        
             )
             print(f"Video saved successfully to: {output_path}")
             
