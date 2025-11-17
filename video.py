@@ -99,11 +99,11 @@ class CustomVideoConcatenator:
         try:
             final_clip.write_videofile(
                 output_path, 
-                codec='libx264',           
-                audio_codec='aac',         
-                temp_audiofile='temp-audio.m4a', # Temporary file for audio processing
-                remove_temp=True,
-                logger=None # Suppress moviepy console spam
+                # codec='libx264',           
+                # audio_codec='aac',         
+                # temp_audiofile='temp-audio.m4a', # Temporary file for audio processing
+                # remove_temp=True,
+                # logger=None # Suppress moviepy console spam
             )
             print(f"Video saved successfully to: {output_path}")
             
