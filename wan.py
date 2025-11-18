@@ -264,7 +264,10 @@ class BaseSceneIteratorNode:
                 return (json.dumps([{"scene": scene_id, "error": error_msg, "status": "failed"}]),)
         # --- END VALIDATION CHECK ---
         
-        total_duration = scenes[0].get("start", 0) 
+        total_duration = scenes[-1].get("end", 0) 
+        total_fps = total_duration * 24
+
+        self.logger.info(f"\n--- Total Duration: {total_duration} | Total FPS: {total_fps} ---")
         # Pre-execution checks and setup
         try:
             video_output_dir_path = Path(video_output_dir)
