@@ -13,7 +13,7 @@ class BaseSceneIteratorNode:
     Handles logging, threading, API communication, and polling.
     
     The derived class MUST implement the abstract method:
-    _inject_scene_into_workflow(self, workflow, scene, video_output_dir)
+    _inject_scene_into_workflow(self, workflow, scene, next_scene, video_output_dir)
     """
     # NOTE: The OUTPUT_NODE_ID should be defined in the derived classes based on the workflow
     # It is used here as a placeholder for the polling logic.
@@ -78,17 +78,21 @@ class BaseSceneIteratorNode:
 
         return logger
 
-    def _inject_scene_into_workflow(self, workflow, scene, video_output_dir):
+    def _inject_scene_into_workflow(self, workflow, scene, next_scene, video_output_dir):
         """
         ABSTRACT METHOD: MUST BE OVERRIDDEN BY DERIVED CLASSES.
         Deep copies the workflow, injects the scene variables, and returns the modified workflow.
+        
+        The 'next_scene' dictionary is now available for transition logic.
         """
         """Deep copies the workflow and injects the scenario and sets the filename prefix."""
         positive_prompt = scene.get("positive_prompt")
-        # negative_prompt = scene.get("negative_prompt")
+        # negative_prompt = scene.get("negative_prompt") # Keeping this commented as in the original code
         scene_id = scene.get("scene", "N/A")
         start = scene.get("start", 0)
         end = scene.get("end", 0)
+
+        next_scene_start = next_scene.get("start", None) if next_scene else None
 
         # Deep copy the workflow template for modification
         wf_copy = copy.deepcopy(workflow)
@@ -96,7 +100,7 @@ class BaseSceneIteratorNode:
         # Positive Prompt Injection 
         if self.POSITIVE_PROMPT_NODE_ID in wf_copy:
             wf_copy[self.POSITIVE_PROMPT_NODE_ID]["inputs"]["text"] = positive_prompt
-            self.logger.info(f"Scene {scene_id} - Injected scenario into node {self.POSITIVE_PROMPT_NODE_ID}.")
+            self.logger.info(f"Scene {scene_id} - Injected positive prompt into node {self.POSITIVE_PROMPT_NODE_ID}.")
         else:
             self.logger.warning(f"Scene {scene_id} - Node {self.POSITIVE_PROMPT_NODE_ID} not found for scenario injection.")
 
@@ -107,7 +111,7 @@ class BaseSceneIteratorNode:
         # else:
         #     self.logger.warning(f"Scene {scene_id} - Node {self.NEGATIVE_PROMPT_NODE_ID} not found for scenario injection.")
 
-        # Filename Prefix Setting (Node 58)
+        # Filename Prefix Setting 
         if self.OUTPUT_NODE_ID in wf_copy:
             prefix = Path(video_output_dir).joinpath(f"scene_{scene_id}").as_posix()
             wf_copy[self.OUTPUT_NODE_ID]["inputs"]["filename_prefix"] = prefix
@@ -124,8 +128,8 @@ class BaseSceneIteratorNode:
             except (ValueError, TypeError):
                 fps = 24.0
                 self.logger.warning(f"Scene {scene_id} - Node {self.FPS_SETTING_NODE_ID} FPS value is invalid. Defaulting to {fps} FPS.")
-            
-            duration = end - start
+
+            duration = (next_scene_start if next_scene_start is not None else end) - start
             # Calculate total required frames, rounding up to ensure the full duration is covered
             required_length = math.ceil(duration * fps)
             
@@ -187,8 +191,11 @@ class BaseSceneIteratorNode:
                 self.logger.warning(f"Scene {scene_id} - Polling connection error ({e}). Retrying in {poll_interval}s...")
 
 
-    def _run_scene(self, comfy_api_url, video_output_dir, workflow_data, scene):
-        """Submits, polls, and tracks the video generation for a single scene."""
+    def _run_scene(self, comfy_api_url, video_output_dir, workflow_data, scene, next_scene):
+        """
+        Submits, polls, and tracks the video generation for a single scene.
+        The `next_scene` dictionary is passed for transition logic.
+        """
         scene_id = scene.get("scene", "N/A")
         scenario = scene.get("positive_prompt", "No scenario provided") # Use positive prompt for preview
         start_time = time.time() 
@@ -197,9 +204,10 @@ class BaseSceneIteratorNode:
         self.logger.info(f"Scenario Preview: {scenario[:80]}...")
         
         try:
-            # 1. Inject Prompt (Calls the derived class's implementation)
+            # 1. Inject Prompt 
             self.logger.info(f"Scene {scene_id} (Step 1/3): Injecting prompt into workflow.")
-            workflow = self._inject_scene_into_workflow(workflow_data, scene, video_output_dir)
+            # Pass next_scene to the injector
+            workflow = self._inject_scene_into_workflow(workflow_data, scene, next_scene, video_output_dir)
             
             # 2. Queue Prompt
             self.logger.info(f"Scene {scene_id} (Step 2/3): Sending prompt to ComfyUI API: {comfy_api_url}/prompt")
@@ -236,7 +244,10 @@ class BaseSceneIteratorNode:
             return {"scene": scene_id, "error": error_message, "status": "failed"}
 
     def run_scenes(self, scenes_json, comfy_api_url, video_output_dir, workflow_path, max_workers = 3, trigger = 0):
-        """Main execution function, running scenes concurrently."""
+        """
+        Main execution function, running scenes concurrently.
+        Now correctly determines and passes the `next_scene` object.
+        """
         total_start_time = time.time()
         try:
             scenes = json.loads(scenes_json)
@@ -265,7 +276,7 @@ class BaseSceneIteratorNode:
         # --- END VALIDATION CHECK ---
         
         total_duration = scenes[-1].get("end", 0) 
-        total_fps = total_duration * 24
+        total_fps = float(total_duration * 24.0)
 
         self.logger.info(f"\n--- Total Duration: {total_duration} | Total FPS: {total_fps} ---")
         # Pre-execution checks and setup
@@ -290,10 +301,20 @@ class BaseSceneIteratorNode:
         
         # Concurrently process scenes
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(self._run_scene, comfy_api_url, video_output_dir_path, workflow_data, scene): scene 
-                for scene in scenes
-            }
+            futures = {}
+            for i, scene in enumerate(scenes):
+                # Determine the next scene object for transition logic
+                next_scene = scenes[i+1] if i + 1 < len(scenes) else None
+                
+                future = executor.submit(
+                    self._run_scene, 
+                    comfy_api_url, 
+                    video_output_dir_path, 
+                    workflow_data, 
+                    scene, 
+                    next_scene # Pass the next scene object
+                )
+                futures[future] = scene # Map future back to the current scene for logging
             
             for future in concurrent.futures.as_completed(futures):
                 try:
@@ -320,13 +341,6 @@ class SceneVideoWan5BIteratorNode(BaseSceneIteratorNode):
     """
     Concrete implementation extending BaseSceneIteratorNode.
     Specializes in injecting scene data into a specific workflow structure.
-    
-    Assumes: 
-    - Node 6: Positive Prompt (Text node)
-    - Node 7: Negative Prompt (Text node)
-    - Node 58: Save Image/Video Node (Filename Prefix)
-    - Node 55: Video Generation Node (Length/Frames)
-    - Node 57: FPS setting node (used for calculation)
     """
 
     OUTPUT_NODE_ID = "58"
@@ -351,13 +365,6 @@ class SceneVideoWan14BIteratorNode(BaseSceneIteratorNode):
     """
     Concrete implementation extending BaseSceneIteratorNode.
     Specializes in injecting scene data into a specific workflow structure.
-    
-    Assumes: 
-    - Node 89: Positive Prompt (Text node)
-    - Node 72: Negative Prompt (Text node)
-    - Node 80: Save Image/Video Node (Filename Prefix)
-    - Node 74: Video Generation Node (Length/Frames)
-    - Node 88: FPS setting node (used for calculation)
     """
 
     OUTPUT_NODE_ID = "80"
@@ -375,6 +382,4 @@ class SceneVideoWan14BIteratorNode(BaseSceneIteratorNode):
     RETURN_NAMES = ("results",)
     FUNCTION = "run_scenes"
     CATEGORY = "Custom Video Generation" 
-    OUTPUT_NODE = True 
-
-    
+    OUTPUT_NODE = True
