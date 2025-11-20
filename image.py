@@ -8,7 +8,7 @@ class LoadImageCustom:
     @classmethod
     def INPUT_TYPES(s):
         return {"required":
-                    {"image_path": {"type": "STRING", "default": "", "multiline": True}},
+                    {"image_path": ("STRING", {"default": "", "tooltip": "Path to the image"})},
                 }
     CATEGORY = "image"
     RETURN_TYPES = ("IMAGE",)
