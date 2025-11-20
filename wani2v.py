@@ -197,7 +197,7 @@ class SceneImage2VideoIterator:
         """Polls the ComfyUI API history for the prompt's completion."""
         target_node_id = output_node_id or self.OUTPUT_NODE_ID
 
-        self.logger.info(f"Scene {scene_id} - Starting poll loop for {"Image Generation" if output_node_id is not None else "Video Generation"} prompt ID: {prompt_id}.")
+        self.logger.info(f"Scene {scene_id} - Starting poll loop for {'Image Generation' if output_node_id is not None else 'Video Generation'} prompt ID: {prompt_id}.")
         
         max_retries = 100
         retries = 0
