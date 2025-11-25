@@ -33,7 +33,7 @@ class SceneImage2VideoIterator:
                 "scenes_json": ("STRING", {
                     "multiline": True,
                     "default": "[]",
-                    "tooltip": "JSON array of scenes with 'scene', 'start', 'end', 'dialogue', and 'positive_prompt'/'negative_prompt' keys"
+                    "tooltip": "JSON array of scenes with 'scene', 'start', 'end', 'dialogue', and 'video_prompt', 'image_prompt','negative_prompt' keys"
                 }),
                 "comfy_api_url": ("STRING", {"default": "http://localhost:8188", "tooltip": "Base URL of the ComfyUI API (e.g., http://localhost:8188)"}),
                 "video_workflow_path": ("STRING", {"default": "./workflow.json", "tooltip": "Path to the ComfyUI video workflow template JSON file."}),
@@ -85,7 +85,7 @@ class SceneImage2VideoIterator:
     def _run_image_generation(self, comfy_api_url, scene, image_workflow_data):
         """Generates the initial image keyframe for the scene."""
         scene_id = scene.get("scene", "N/A")
-        positive_prompt = scene.get("positive_prompt")
+        positive_prompt = scene.get("image_prompt")
         start_time = time.time() 
 
         self.logger.info(f"Scene {scene_id} - **Image Generation Start** (Node {self.IMAGE_OUTPUT_NODE_ID}).") # New log
@@ -133,7 +133,7 @@ class SceneImage2VideoIterator:
         The 'next_scene' dictionary is now available for transition logic.
         """
         """Deep copies the workflow and injects the scenario and sets the filename prefix."""
-        positive_prompt = scene.get("positive_prompt")
+        positive_prompt = scene.get("video_prompt")
         # negative_prompt = scene.get("negative_prompt") # Keeping this commented as in the original code
         scene_id = scene.get("scene", "N/A")
         start = scene.get("start", 0)
@@ -265,7 +265,7 @@ class SceneImage2VideoIterator:
         The `next_scene` dictionary is passed for transition logic.
         """
         scene_id = scene.get("scene", "N/A")
-        scenario = scene.get("positive_prompt", "No scenario provided") # Use positive prompt for preview
+        scenario = scene.get("video_prompt", "No scenario provided") # Use positive prompt for preview
         start_time = time.time() 
         
         self.logger.info(f"\n--- Scene {scene_id} START ---")
@@ -335,9 +335,14 @@ class SceneImage2VideoIterator:
         # --- MANDATORY VALIDATION CHECK ---
         for i, scene in enumerate(scenes):
             scene_id = scene.get("scene", f"Index {i+1}")
+            if "image_prompt" not in scene or not scene["image_prompt"]:
+                error_msg = f"Scene {scene_id} is missing the required key: 'image_prompt' or its value is empty. Cannot proceed."
+                self.logger.error(error_msg)
+                return (json.dumps([{"scene": scene_id, "error": error_msg, "status": "failed"}]),)
             
-            if "positive_prompt" not in scene or not scene["positive_prompt"]:
-                error_msg = f"Scene {scene_id} is missing the required key: 'positive_prompt' or its value is empty. Cannot proceed."
+
+            if "video_prompt" not in scene or not scene["video_prompt"]:
+                error_msg = f"Scene {scene_id} is missing the required key: 'video_prompt' or its value is empty. Cannot proceed."
                 self.logger.error(error_msg)
                 return (json.dumps([{"scene": scene_id, "error": error_msg, "status": "failed"}]),)
             
