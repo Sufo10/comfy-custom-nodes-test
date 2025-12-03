@@ -6,6 +6,7 @@ from .wan import SceneVideoWan14BIteratorNode, SceneVideoWan5BIteratorNode
 from .video import CustomVideoConcatenator
 from .wani2v import SceneImage2VideoIterator
 from .image import LoadImageCustom
+from .wanfirstlasti2v import SceneImage2VideoFirstLastIterator
 
 NODE_CLASS_MAPPINGS = { 
     "Whisper Transcribe" : WhisperTranscribeNode,
@@ -16,7 +17,8 @@ NODE_CLASS_MAPPINGS = {
     "JSON Array Path Multiline Concatenator" : JSONArrayPathMultilineConcatenator,
     "Custom Pymovie Video Concatenator" : CustomVideoConcatenator,
     "Scene Video WAN 14B Image to Video Iterator" : SceneImage2VideoIterator,
-    "Load Image Custom" : LoadImageCustom
+    "Load Image Custom" : LoadImageCustom,
+    "Scene Image to Video First Last Iterator" : SceneImage2VideoFirstLastIterator
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -28,7 +30,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
      "JSON Array Path Multiline Concatenator": "JSON Array Path Multiline Concatenator",
      "Custom Pymovie Video Concatenator": "Custom Pymovie Video Concatenator",
      "Scene Video WAN 14B Image to Video Iterator": "Scene Video WAN 14B Image to Video Iterator",
-     "Load Image Custom": "Load Image Custom"
+     "Load Image Custom": "Load Image Custom",
+     "Scene Image to Video First Last Iterator": "Scene Image to Video First Last Iterator"
 }
 
 

@@ -1,0 +1,181 @@
+{
+  "1": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "2": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "5": {
+    "inputs": {
+      "samples": [
+        "15",
+        0
+      ],
+      "vae": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "9": {
+    "inputs": {
+      "shift": 3.1000000000000005,
+      "model": [
+        "11",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "10": {
+    "inputs": {
+      "filename_prefix": "image/ComfyUI",
+      "images": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "11": {
+    "inputs": {
+      "lora_name": "Qwen-Image-Lightning-8steps-V1.0.safetensors",
+      "strength_model": 1,
+      "model": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly"
+    }
+  },
+  "12": {
+    "inputs": {
+      "unet_name": "qwen_image_fp8_e4m3fn.safetensors",
+      "weight_dtype": "fp8_e4m3fn"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "14": {
+    "inputs": {
+      "text": "people, faces, human figures, hands, body parts, avatars, characters, presenters, instructors, stick figures, silhouettes of humans, photorealistic humans, talking heads, blurry, low quality, distorted, deformed, incorrect proportions, misaligned text, spelling errors, typos, watermarks, cluttered composition, busy background, visual noise, jerky animation, stuttering motion, unnatural movement, abrupt transitions, flickering, compression artifacts, floating disconnected elements, morphing shapes, inconsistent style between frames, realistic 3D rendering, photographs, complex scientific diagrams, mathematical equations, circuit boards, biological imagery, medical symbols, warm red and orange color schemes",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Negative Prompt)"
+    }
+  },
+  "15": {
+    "inputs": {
+      "seed": 1016747538481814,
+      "steps": 40,
+      "cfg": 2.5,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1,
+      "model": [
+        "9",
+        0
+      ],
+      "positive": [
+        "16",
+        0
+      ],
+      "negative": [
+        "14",
+        0
+      ],
+      "latent_image": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "16": {
+    "inputs": {
+      "text": "A modern flat design style infographic introducing the series, with camera at 1.1x zoom centered on the composition. The title 'Physics Made Simple' appears prominently in large bold letters at the top center in dark blue, with a stylized atom icon (three orbiting electrons around a nucleus) positioned to the left of the text in vibrant blue. Below the title, the subtitle 'Newton's Laws of Motion' is clearly visible in smaller gray text. Subtle gear shapes frame all four corners of the composition in light gray with a gentle rotation suggesting motion. The composition is perfectly balanced horizontally with generous white space, using clean line icons and a minimalist aesthetic. All elements are fully visible with a subtle glow effect on the atom icon, creating a welcoming and professional educational introduction with a soft light blue to white gradient background.",
+      "clip": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Positive Prompt)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "image_path": "output/image/ComfyUI_00035_.png"
+    },
+    "class_type": "Load Image Custom",
+    "_meta": {
+      "title": "Load Image Custom"
+    }
+  },
+  "19": {
+    "inputs": {
+      "image": [
+        "18",
+        0
+      ]
+    },
+    "class_type": "FluxKontextImageScale",
+    "_meta": {
+      "title": "FluxKontextImageScale"
+    }
+  },
+  "20": {
+    "inputs": {
+      "pixels": [
+        "19",
+        0
+      ],
+      "vae": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  }
+}
