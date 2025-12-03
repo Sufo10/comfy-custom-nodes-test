@@ -229,14 +229,14 @@ class SceneImage2VideoIterator:
                         self.logger.info(f"Scene {scene_id} - Polling successful. Status: COMPLETED. Output Info: {output_info}")
 
                         
-                        if is_image_poll:
-                            # For image generation, the path is often just the filename for later reuse
-                            output_path = output_info.get('filename', '')
-                            log_path = f"Filename: {output_path}"
-                        else:
+                        # if is_image_poll:
+                        #     # For image generation, the path is often just the filename for later reuse
+                        #     output_path = output_info.get('filename', '')
+                        #     log_path = f"Filename: {output_path}"
+                        # else:
                             # For video generation, it's the full path including subfolder/type
-                            output_path = f"{output_info.get('type')}/{output_info.get('subfolder', '')}/{output_info.get('filename', '')}"
-                            log_path = f"Full Path: {output_path}"
+                        output_path = f"{output_info.get('type')}/{output_info.get('subfolder', '')}/{output_info.get('filename', '')}"
+                        log_path = f"Full Path: {output_path}"
                             
                         self.logger.info(f"Scene {scene_id} - **{step_name}** completed. Path: {log_path}") # Modified log
                         return output_path
